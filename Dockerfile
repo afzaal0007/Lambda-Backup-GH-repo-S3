@@ -1,26 +1,29 @@
-# Use lightweight Python 3.10 slim base image
-FROM python:3.10-slim
+# Use AWS Lambda Python 3.10 base image
+FROM public.ecr.aws/lambda/python:3.10
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8
+# Install system dependencies
+RUN yum install -y \
+      git \
+      tar \
+      gzip \
+      ca-certificates \
+    && yum clean all \
+    && rm -rf /var/cache/yum
 
-# Install git and cleanup
-RUN apt-get update && \
-    apt-get install -y git && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Set the working directory
+WORKDIR /var/task
 
-# Set work directory
-WORKDIR /app
-
-# Copy your Lambda handler and requirements
+# Install Python dependencies first (for better layer caching)
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && rm -f requirements.txt
 
-COPY app.py .
+# Copy application files
+COPY app.py ./
+
+# Verify git is working
+RUN git --version && \
+    echo "Git installed successfully"
 
 # Set the Lambda handler
 CMD ["app.lambda_handler"]
